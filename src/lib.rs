@@ -4,6 +4,7 @@ pub struct Lexer {
     tokens: Option<Vec<Token>>,
     start: usize,
     current: usize,
+    line: usize,
 }
 
 impl Lexer {
@@ -13,18 +14,19 @@ impl Lexer {
             tokens: Some(Vec::new()),
             start: 0,
             current: 0,
+            line: 1,
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Option<Vec<Token>> {
+    pub fn scan_tokens(&mut self) -> Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
         }
-        self.tokens.take()
+        self.tokens.take().unwrap_or_default()
     }
 
-    fn is_at_end(&mut self) -> bool {
+    fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
 
@@ -37,24 +39,38 @@ impl Lexer {
             ']' => self.add_token(TokenType::RightCurlyBracket),
             ':' => self.add_token(TokenType::Colon),
             ',' => self.add_token(TokenType::Comma),
+            '\n' => {
+                self.line = self.line + 1;
+            }
             ' ' | '\r' | '\t' => {}
+
             _ => report("Unexpected character"),
         }
     }
 
     fn add_token(&mut self, token_type: TokenType) {
         let text: String = self.source[self.start..self.current].iter().collect();
-        self.tokens.as_mut().expect("add token").push(Token {
-            token_type,
-            lexeme: String::from(text),
-            literal: Value::Null,
-        });
+        match self.tokens.as_mut() {
+            Some(tokens) => tokens.push(Token {
+                token_type,
+                lexeme: String::from(text),
+                literal: Value::Null,
+            }),
+            None => {}
+        }
     }
 
     fn advance(&mut self) -> char {
         let c = self.source[self.current];
         self.current = self.current + 1;
         c
+    }
+
+    fn peek(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+        self.source[self.current]
     }
 }
 
@@ -64,6 +80,7 @@ pub struct Token {
     pub literal: Value,
 }
 
+#[derive(PartialEq, Debug)]
 pub enum TokenType {
     LeftCurlyBracket,
     RightCurlyBracket,
@@ -90,4 +107,43 @@ pub fn read_file(path: &str) -> String {
 
 pub fn report(e: &str) {
     println!("{e}");
+}
+
+#[cfg(test)]
+mod step_1 {
+    use super::*;
+
+    #[test]
+    fn valid_json_file() {
+        let contents = read_file("tests/step1/valid.json");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut token_iter = tokens.iter();
+
+        assert_eq!(
+            token_iter.next().unwrap().token_type,
+            TokenType::LeftCurlyBracket
+        );
+        assert_eq!(
+            token_iter.next().unwrap().token_type,
+            TokenType::RightCurlyBracket
+        );
+    }
+
+    #[test]
+    fn valid_2_json_file() {
+        let contents = read_file("tests/step1/valid2.json");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut token_iter = tokens.iter();
+
+        assert_eq!(
+            token_iter.next().unwrap().token_type,
+            TokenType::LeftCurlyBracket
+        );
+        assert_eq!(
+            token_iter.next().unwrap().token_type,
+            TokenType::RightCurlyBracket
+        );
+    }
 }
