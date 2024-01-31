@@ -42,6 +42,9 @@ impl Lexer {
             '\n' => {
                 self.line = self.line + 1;
             }
+            '"' => {
+                self.string();
+            }
             ' ' | '\r' | '\t' => {}
 
             _ => report("Unexpected character"),
@@ -72,6 +75,8 @@ impl Lexer {
         }
         self.source[self.current]
     }
+
+    fn string(&mut self) {}
 }
 
 pub struct Token {
