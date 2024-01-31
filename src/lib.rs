@@ -1,7 +1,8 @@
 use std::fs;
+use std::io;
 pub struct Lexer {
     source: Vec<char>,
-    tokens: Option<Vec<Token>>,
+    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
@@ -11,19 +12,19 @@ impl Lexer {
     pub fn new(source: String) -> Self {
         Lexer {
             source: source.chars().collect(),
-            tokens: Some(Vec::new()),
+            tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> &Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
         }
-        self.tokens.take().unwrap_or_default()
+        &self.tokens
     }
 
     fn is_at_end(&self) -> bool {
@@ -33,12 +34,12 @@ impl Lexer {
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
-            '{' => self.add_token(TokenType::LeftCurlyBracket),
-            '}' => self.add_token(TokenType::RightCurlyBracket),
-            '[' => self.add_token(TokenType::LeftCurlyBracket),
-            ']' => self.add_token(TokenType::RightCurlyBracket),
-            ':' => self.add_token(TokenType::Colon),
-            ',' => self.add_token(TokenType::Comma),
+            '{' => self.add_token(TokenType::LeftCurlyBracket, None),
+            '}' => self.add_token(TokenType::RightCurlyBracket, None),
+            '[' => self.add_token(TokenType::LeftCurlyBracket, None),
+            ']' => self.add_token(TokenType::RightCurlyBracket, None),
+            ':' => self.add_token(TokenType::Colon, None),
+            ',' => self.add_token(TokenType::Comma, None),
             '\n' => {
                 self.line = self.line + 1;
             }
@@ -51,16 +52,13 @@ impl Lexer {
         }
     }
 
-    fn add_token(&mut self, token_type: TokenType) {
+    fn add_token(&mut self, token_type: TokenType, literal: Option<Value>) {
         let text: String = self.source[self.start..self.current].iter().collect();
-        match self.tokens.as_mut() {
-            Some(tokens) => tokens.push(Token {
-                token_type,
-                lexeme: String::from(text),
-                literal: Value::Null,
-            }),
-            None => {}
-        }
+        self.tokens.push(Token {
+            token_type,
+            lexeme: String::from(text),
+            literal: literal.unwrap_or(Value::Null),
+        })
     }
 
     fn advance(&mut self) -> char {
@@ -76,7 +74,25 @@ impl Lexer {
         self.source[self.current]
     }
 
-    fn string(&mut self) {}
+    fn string(&mut self) {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line = self.line + 1;
+            }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            report("Unterminated string.");
+            return;
+        }
+        self.advance();
+
+        let literal = self.source[self.start + 1..self.current - 1]
+            .iter()
+            .collect();
+        self.add_token(TokenType::String, Some(Value::String(literal)));
+    }
 }
 
 pub struct Token {
@@ -105,9 +121,28 @@ pub enum Value {
 
 pub struct Parser;
 
-pub fn read_file(path: &str) -> String {
+pub fn run_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Unable to read file");
-    contents
+    let mut lexer = Lexer::new(contents);
+    let tokens = lexer.scan_tokens();
+    for token in tokens {
+        println!("{:?}", token.lexeme);
+    }
+}
+
+pub fn run_prompt() {
+    loop {
+        let mut prompt = String::new();
+        io::stdin()
+            .read_line(&mut prompt)
+            .expect("Failed to read line");
+
+        let mut lexer = Lexer::new(prompt.to_owned());
+        let tokens = lexer.scan_tokens();
+        for token in tokens {
+            println!("{:?}", token.lexeme);
+        }
+    }
 }
 
 pub fn report(e: &str) {
@@ -120,7 +155,7 @@ mod step_1 {
 
     #[test]
     fn valid_json_file() {
-        let contents = read_file("tests/step1/valid.json");
+        let contents = fs::read_to_string("tests/step1/valid.json").expect("Unable to read file");
         let mut lexer = Lexer::new(contents);
         let tokens = lexer.scan_tokens();
         let mut token_iter = tokens.iter();
@@ -137,7 +172,7 @@ mod step_1 {
 
     #[test]
     fn valid_2_json_file() {
-        let contents = read_file("tests/step1/valid2.json");
+        let contents = fs::read_to_string("tests/step1/valid2.json").expect("Unable to read file");
         let mut lexer = Lexer::new(contents);
         let tokens = lexer.scan_tokens();
         let mut token_iter = tokens.iter();

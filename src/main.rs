@@ -1,9 +1,10 @@
-use ::simple_json_parser::{read_file, Lexer};
+use ::simple_json_parser::{run_file, run_prompt};
+use std::env;
 fn main() {
-    let contents = read_file("tests/step1/valid.json");
-    let mut lexer = Lexer::new(contents);
-    let tokens = lexer.scan_tokens();
-    for token in tokens {
-        println!("{:?}", token.lexeme);
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 1 {
+        run_prompt();
+    } else {
+        run_file("tests/step1/valid.json");
     }
 }
