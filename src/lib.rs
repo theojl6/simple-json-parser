@@ -103,9 +103,7 @@ impl Lexer {
             self.advance();
         }
         let string_digit: String = self.source[self.start..self.current].iter().collect();
-        println!("string_digit {string_digit}");
         let number = string_digit.parse::<i32>().expect("Unable to parse digit");
-        println!("number {number}");
         self.add_token(TokenType::Number, Some(Value::Number(number)))
     }
 }
