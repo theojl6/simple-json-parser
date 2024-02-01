@@ -1,3 +1,4 @@
+use core::fmt;
 use std::fs;
 use std::io;
 pub struct Lexer {
@@ -46,6 +47,9 @@ impl Lexer {
             '"' => {
                 self.string();
             }
+            c if c.is_ascii_digit() => {
+                self.number();
+            }
             ' ' | '\r' | '\t' => {}
 
             _ => report("Unexpected character"),
@@ -93,6 +97,17 @@ impl Lexer {
             .collect();
         self.add_token(TokenType::String, Some(Value::String(literal)));
     }
+
+    fn number(&mut self) {
+        while self.peek().is_ascii_digit() && !self.is_at_end() {
+            self.advance();
+        }
+        let string_digit: String = self.source[self.start..self.current].iter().collect();
+        println!("string_digit {string_digit}");
+        let number = string_digit.parse::<i32>().expect("Unable to parse digit");
+        println!("number {number}");
+        self.add_token(TokenType::Number, Some(Value::Number(number)))
+    }
 }
 
 pub struct Token {
@@ -110,12 +125,14 @@ pub enum TokenType {
     LeftSquareBracket,
     RightSquareBracket,
     String,
+    Number,
 }
 
 pub enum Value {
     String(String),
     Number(i32),
     Array(Vec<Value>),
+    Bool(bool),
     Null,
 }
 
