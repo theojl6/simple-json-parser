@@ -1,4 +1,4 @@
-use core::fmt;
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 pub struct Lexer {
@@ -7,16 +7,22 @@ pub struct Lexer {
     start: usize,
     current: usize,
     line: usize,
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Lexer {
     pub fn new(source: String) -> Self {
+        let mut keywords = HashMap::new();
+        keywords.insert(String::from("null"), TokenType::Null);
+        keywords.insert(String::from("true"), TokenType::True);
+        keywords.insert(String::from("false"), TokenType::False);
         Lexer {
             source: source.chars().collect(),
             tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
+            keywords,
         }
     }
 
@@ -51,6 +57,9 @@ impl Lexer {
                 self.number();
             }
             ' ' | '\r' | '\t' => {}
+            a if a.is_ascii_alphabetic() => {
+                self.identifier();
+            }
 
             _ => report("Unexpected character"),
         }
@@ -106,6 +115,20 @@ impl Lexer {
         let number = string_digit.parse::<i32>().expect("Unable to parse digit");
         self.add_token(TokenType::Number, Some(Value::Number(number)))
     }
+
+    fn identifier(&mut self) {
+        while self.peek().is_ascii_alphanumeric() {
+            self.advance();
+        }
+        let text: String = self.source[self.start..self.current].iter().collect();
+        let token_type = self.keywords.get(&text);
+        match token_type {
+            Some(t) => {
+                self.add_token(t.clone(), None);
+            }
+            None => report("Unexpected character."),
+        }
+    }
 }
 
 pub struct Token {
@@ -114,7 +137,7 @@ pub struct Token {
     pub literal: Value,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TokenType {
     LeftCurlyBracket,
     RightCurlyBracket,
@@ -124,6 +147,9 @@ pub enum TokenType {
     RightSquareBracket,
     String,
     Number,
+    Null,
+    True,
+    False,
 }
 
 pub enum Value {
