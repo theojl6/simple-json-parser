@@ -160,7 +160,16 @@ pub enum Value {
     Null,
 }
 
-pub struct Parser;
+// expression -> pair
+// pair -> key ":" value
+// key -> string
+// value -> string | number | "null" | "true" | "false"
+// object -> "{" (pair ",")* "}"
+// array -> "[" (value ",")* "]"
+pub struct Parser<'a> {
+    tokens: &'a Vec<Token>,
+    current: usize,
+}
 
 pub fn run_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Unable to read file");
