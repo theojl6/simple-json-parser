@@ -10,7 +10,6 @@ pub struct Lexer {
     keywords: HashMap<String, TokenType>,
 }
 
-// add EOF somewhere
 impl Lexer {
     pub fn new(source: String) -> Self {
         let mut keywords = HashMap::new();
@@ -159,23 +158,24 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     String(String),
     Number(i32),
     Array(Vec<Value>),
     Bool(bool),
     Null,
+    Object(Box<[(String, Value)]>),
 }
 
+#[derive(Debug)]
 pub enum Expression {
-    Pair(String, Value),
     Literal(Value),
 }
 
 // expression -> pair | literal
 // pair -> string ":" literal
-// literal -> string | number | "null" | "true" | "false"
+// literal -> string | number | "null" | "true" | "false" | object
 // object -> "{" (pair ",")* "}"
 // array -> "[" (literal ",")* "]"
 pub struct Parser<'a> {
@@ -188,12 +188,12 @@ impl<'a> Parser<'a> {
         Parser { tokens, current: 0 }
     }
 
-    fn expression(&mut self) {
-        self.pair()
+    pub fn parse(&mut self) -> Expression {
+        self.expression()
     }
 
-    fn pair(&mut self) {
-        let value = self.primary();
+    fn expression(&mut self) -> Expression {
+        self.primary()
     }
 
     fn primary(&mut self) -> Expression {
@@ -206,7 +206,31 @@ impl<'a> Parser<'a> {
         if self.matches(Box::new([TokenType::Number, TokenType::String])) {
             return Expression::Literal(self.previous().literal.clone());
         }
+        if self.matches(Box::new([TokenType::LeftCurlyBracket])) {
+            return self.object();
+        }
         return Expression::Literal(Value::Null);
+    }
+
+    fn object(&mut self) -> Expression {
+        let mut pairs = Vec::new();
+        while self.matches(Box::new([TokenType::String, TokenType::Colon])) {
+            let key = self.previous().literal.clone();
+            let key_string = match key {
+                Value::String(s) => s,
+                _ => {
+                    report("Something went wrong.");
+                    String::from("")
+                }
+            };
+            self.advance();
+            let value = self.peek().literal.clone();
+            pairs.push((key_string, value));
+        }
+        if self.matches(Box::new([TokenType::RightCurlyBracket])) {
+            return Expression::Literal(Value::Object(pairs.into_boxed_slice()));
+        }
+        return Expression::Literal(Value::Object(Box::new([])));
     }
 
     fn matches(&mut self, token_types: Box<[TokenType]>) -> bool {
@@ -251,9 +275,9 @@ pub fn run_file(path: &str) {
     let contents = fs::read_to_string(path).expect("Unable to read file");
     let mut lexer = Lexer::new(contents);
     let tokens = lexer.scan_tokens();
-    for token in tokens {
-        println!("{:?}", token.lexeme);
-    }
+    let mut parser = Parser::new(tokens);
+    let expression = parser.parse();
+    println!("{:?}", expression);
 }
 
 pub fn run_prompt() {
@@ -265,9 +289,9 @@ pub fn run_prompt() {
 
         let mut lexer = Lexer::new(prompt.to_owned());
         let tokens = lexer.scan_tokens();
-        for token in tokens {
-            println!("{:?}", token.lexeme);
-        }
+        let mut parser = Parser::new(tokens);
+        let expression = parser.parse();
+        println!("{:?}", expression);
     }
 }
 
