@@ -10,6 +10,7 @@ pub struct Lexer {
     keywords: HashMap<String, TokenType>,
 }
 
+// add EOF somewhere
 impl Lexer {
     pub fn new(source: String) -> Self {
         let mut keywords = HashMap::new();
@@ -31,6 +32,11 @@ impl Lexer {
             self.start = self.current;
             self.scan_token();
         }
+        self.tokens.push(Token {
+            token_type: TokenType::Eof,
+            lexeme: String::from(""),
+            literal: Value::Null,
+        });
         &self.tokens
     }
 
@@ -150,8 +156,10 @@ pub enum TokenType {
     Null,
     True,
     False,
+    Eof,
 }
 
+#[derive(Clone)]
 pub enum Value {
     String(String),
     Number(i32),
@@ -160,15 +168,83 @@ pub enum Value {
     Null,
 }
 
-// expression -> pair
-// pair -> key ":" value
-// key -> string
-// value -> string | number | "null" | "true" | "false"
+pub enum Expression {
+    Pair(String, Value),
+    Literal(Value),
+}
+
+// expression -> pair | literal
+// pair -> string ":" literal
+// literal -> string | number | "null" | "true" | "false"
 // object -> "{" (pair ",")* "}"
-// array -> "[" (value ",")* "]"
+// array -> "[" (literal ",")* "]"
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(tokens: &Vec<Token>) -> Parser {
+        Parser { tokens, current: 0 }
+    }
+
+    fn expression(&mut self) {
+        self.pair()
+    }
+
+    fn pair(&mut self) {
+        let value = self.primary();
+    }
+
+    fn primary(&mut self) -> Expression {
+        if self.matches(Box::new([TokenType::False])) {
+            return Expression::Literal(Value::Bool(false));
+        }
+        if self.matches(Box::new([TokenType::True])) {
+            return Expression::Literal(Value::Bool(true));
+        }
+        if self.matches(Box::new([TokenType::Number, TokenType::String])) {
+            return Expression::Literal(self.previous().literal.clone());
+        }
+        return Expression::Literal(Value::Null);
+    }
+
+    fn matches(&mut self, token_types: Box<[TokenType]>) -> bool {
+        for token_type in token_types.iter() {
+            if self.check(token_type) {
+                self.advance();
+                return true;
+            }
+        }
+        false
+    }
+
+    fn check(&self, token_type: &TokenType) -> bool {
+        if self.is_at_end() {
+            return false;
+        }
+
+        self.peek().token_type == *token_type
+    }
+
+    fn advance(&mut self) -> &Token {
+        if !self.is_at_end() {
+            self.current = self.current + 1;
+        }
+        self.previous()
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.peek().token_type == TokenType::Eof
+    }
+
+    fn peek(&self) -> &Token {
+        &self.tokens[self.current]
+    }
+
+    fn previous(&self) -> &Token {
+        &self.tokens[self.current - 1]
+    }
 }
 
 pub fn run_file(path: &str) {
