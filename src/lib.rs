@@ -224,7 +224,10 @@ impl<'a> Parser<'a> {
                 }
             };
             self.advance();
-            let value = self.peek().literal.clone();
+            let expr = self.primary();
+            let value = match expr {
+                Expression::Literal(value) => value,
+            };
             pairs.push((key_string, value));
         }
         if self.matches(Box::new([TokenType::RightCurlyBracket])) {
