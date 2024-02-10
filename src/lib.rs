@@ -48,8 +48,8 @@ impl Lexer {
         match c {
             '{' => self.add_token(TokenType::LeftCurlyBracket, None),
             '}' => self.add_token(TokenType::RightCurlyBracket, None),
-            '[' => self.add_token(TokenType::LeftCurlyBracket, None),
-            ']' => self.add_token(TokenType::RightCurlyBracket, None),
+            '[' => self.add_token(TokenType::LeftSquareBracket, None),
+            ']' => self.add_token(TokenType::RightSquareBracket, None),
             ':' => self.add_token(TokenType::Colon, None),
             ',' => self.add_token(TokenType::Comma, None),
             '\n' => {
@@ -245,6 +245,24 @@ impl<'a> Parser<'a> {
     }
 
     fn array(&mut self) -> Value {
+        let mut values = Vec::new();
+        while self.peek().token_type != TokenType::RightSquareBracket && !self.is_at_end() {
+            let value = self.expression();
+            values.push(value);
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
+        }
+        if self.previous().token_type != TokenType::Comma {
+            if self.matches(Box::new([TokenType::RightSquareBracket])) {
+                return Value::Array(values);
+            } else {
+                report("Unclosed square brackets.");
+            }
+        } else {
+            report("Unexpected comma.")
+        }
+
         return Value::Array(Vec::new());
     }
 
