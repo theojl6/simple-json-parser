@@ -13,17 +13,17 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(source: String) -> Self {
-        let mut keywords = HashMap::new();
-        keywords.insert(String::from("null"), TokenType::Null);
-        keywords.insert(String::from("true"), TokenType::True);
-        keywords.insert(String::from("false"), TokenType::False);
         Lexer {
             source: source.chars().collect(),
             tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
-            keywords,
+            keywords: HashMap::from([
+                (String::from("null"), TokenType::Null),
+                (String::from("true"), TokenType::True),
+                (String::from("false"), TokenType::False),
+            ]),
             has_error: false,
         }
     }
