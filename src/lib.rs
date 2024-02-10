@@ -8,6 +8,7 @@ pub struct Lexer {
     current: usize,
     line: usize,
     keywords: HashMap<String, TokenType>,
+    has_error: bool,
 }
 
 impl Lexer {
@@ -23,6 +24,7 @@ impl Lexer {
             current: 0,
             line: 1,
             keywords,
+            has_error: false,
         }
     }
 
@@ -66,7 +68,7 @@ impl Lexer {
                 self.identifier();
             }
 
-            _ => report("Unexpected character"),
+            _ => report("Unexpected character", &mut self.has_error),
         }
     }
 
@@ -101,7 +103,7 @@ impl Lexer {
         }
 
         if self.is_at_end() {
-            report("Unterminated string.");
+            report("Unterminated string.", &mut self.has_error);
             return;
         }
         self.advance();
@@ -131,7 +133,7 @@ impl Lexer {
             Some(t) => {
                 self.add_token(t.clone(), None);
             }
-            None => report("Unexpected character."),
+            None => report("Unexpected character.", &mut self.has_error),
         }
     }
 }
@@ -158,14 +160,14 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     String(String),
     Number(i32),
     Array(Vec<Value>),
     Bool(bool),
     Null,
-    Object(Box<[(String, Value)]>),
+    Object(HashMap<String, Value>),
 }
 
 // pair -> string ":" value
@@ -175,11 +177,16 @@ pub enum Value {
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
+    has_error: bool,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &Vec<Token>) -> Parser {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            has_error: false,
+        }
     }
 
     pub fn parse(&mut self) -> Value {
@@ -209,39 +216,40 @@ impl<'a> Parser<'a> {
         if self.matches(Box::new([TokenType::LeftSquareBracket])) {
             return self.array();
         }
-        report("Unrecognized value");
+        report("Unrecognized value", &mut self.has_error);
         return Value::Null;
     }
 
     fn object(&mut self) -> Value {
-        let mut pairs = Vec::new();
+        let mut pairs = HashMap::new();
         while self.matches(Box::new([TokenType::String, TokenType::Colon])) {
             let key = self.previous().literal.clone();
             let key_string = match key {
                 Value::String(s) => s,
                 _ => {
-                    report("Something went wrong.");
+                    report("Something went wrong.", &mut self.has_error);
                     String::from("")
                 }
             };
             self.advance();
             let value = self.expression();
-            pairs.push((key_string, value));
+            pairs.insert(key_string, value);
             if self.check(&TokenType::Comma) {
                 self.advance();
             }
         }
         if self.previous().token_type != TokenType::Comma {
             if self.matches(Box::new([TokenType::RightCurlyBracket])) {
-                return Value::Object(pairs.into_boxed_slice());
+                return Value::Object(pairs);
             } else {
-                report("Unclosed curly brackets.");
+                report("Unclosed curly brackets.", &mut self.has_error);
             }
         } else {
-            report("Unexpected comma.")
+            report("Unexpected comma.", &mut self.has_error)
         }
+        println!("has_error: {}", self.has_error);
 
-        return Value::Object(Box::new([]));
+        return Value::Object(HashMap::new());
     }
 
     fn array(&mut self) -> Value {
@@ -257,10 +265,10 @@ impl<'a> Parser<'a> {
             if self.matches(Box::new([TokenType::RightSquareBracket])) {
                 return Value::Array(values);
             } else {
-                report("Unclosed square brackets.");
+                report("Unclosed square brackets.", &mut self.has_error);
             }
         } else {
-            report("Unexpected comma.")
+            report("Unexpected comma.", &mut self.has_error)
         }
 
         return Value::Array(Vec::new());
@@ -328,7 +336,8 @@ pub fn run_prompt() {
     }
 }
 
-pub fn report(e: &str) {
+pub fn report(e: &str, has_error: &mut bool) {
+    *has_error = true;
     println!("{e}");
 }
 
@@ -337,7 +346,7 @@ mod step_1 {
     use super::*;
 
     #[test]
-    fn valid_json_file() {
+    fn valid() {
         let contents = fs::read_to_string("tests/step1/valid.json").expect("Unable to read file");
         let mut lexer = Lexer::new(contents);
         let tokens = lexer.scan_tokens();
@@ -354,7 +363,7 @@ mod step_1 {
     }
 
     #[test]
-    fn valid_2_json_file() {
+    fn valid_2() {
         let contents = fs::read_to_string("tests/step1/valid2.json").expect("Unable to read file");
         let mut lexer = Lexer::new(contents);
         let tokens = lexer.scan_tokens();
@@ -368,5 +377,109 @@ mod step_1 {
             token_iter.next().unwrap().token_type,
             TokenType::RightCurlyBracket
         );
+    }
+}
+
+#[cfg(test)]
+mod step_2 {
+
+    use super::*;
+
+    #[test]
+    fn valid() {
+        let contents = fs::read_to_string("tests/step2/valid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let value = parser.parse();
+
+        match value {
+            Value::Object(o) => {
+                assert!(o.contains_key("key"));
+                assert_eq!(*o.get("key").unwrap(), Value::String(String::from("value")));
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn valid_2() {
+        let contents = fs::read_to_string("tests/step2/valid2.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let value = parser.parse();
+
+        match value {
+            Value::Object(o) => {
+                assert!(o.contains_key("key"));
+                assert_eq!(*o.get("key").unwrap(), Value::String(String::from("value")));
+
+                assert!(o.contains_key("key2"));
+                assert_eq!(
+                    *o.get("key2").unwrap(),
+                    Value::String(String::from("value"))
+                );
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn invalid() {
+        let contents = fs::read_to_string("tests/step2/invalid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        parser.parse();
+        assert!(parser.has_error);
+    }
+
+    #[test]
+    fn invalid_2() {
+        let contents =
+            fs::read_to_string("tests/step2/invalid2.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        parser.parse();
+        assert!(parser.has_error);
+    }
+}
+
+#[cfg(test)]
+mod step_3 {
+    use super::*;
+
+    #[test]
+    fn valid() {
+        let contents = fs::read_to_string("tests/step3/valid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let value = parser.parse();
+
+        match value {
+            Value::Object(o) => {
+                assert!(o.contains_key("key1"));
+                assert_eq!(*o.get("key1").unwrap(), Value::Bool(true));
+
+                assert!(o.contains_key("key2"));
+                assert_eq!(*o.get("key2").unwrap(), Value::Bool(false));
+
+                assert!(o.contains_key("key3"));
+                assert_eq!(*o.get("key3").unwrap(), Value::Null);
+
+                assert!(o.contains_key("key4"));
+                assert_eq!(
+                    *o.get("key4").unwrap(),
+                    Value::String(String::from("value"))
+                );
+
+                assert!(o.contains_key("key5"));
+                assert_eq!(*o.get("key5").unwrap(), Value::Number(101));
+            }
+            _ => panic!(),
+        }
     }
 }
