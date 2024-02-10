@@ -378,6 +378,16 @@ mod step_1 {
             TokenType::RightCurlyBracket
         );
     }
+
+    #[test]
+    fn invalid() {
+        let contents = fs::read_to_string("tests/step1/invalid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        parser.parse();
+        assert!(parser.has_error)
+    }
 }
 
 #[cfg(test)]
@@ -481,5 +491,97 @@ mod step_3 {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn invalid() {
+        let contents = fs::read_to_string("tests/step3/invalid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        parser.parse();
+        assert!(parser.has_error);
+    }
+}
+
+#[cfg(test)]
+mod step_4 {
+    use super::*;
+
+    #[test]
+    fn valid() {
+        let contents = fs::read_to_string("tests/step4/valid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let value = parser.parse();
+
+        match value {
+            Value::Object(o) => {
+                assert!(o.contains_key("key"));
+                assert_eq!(*o.get("key").unwrap(), Value::String(String::from("value")));
+
+                assert!(o.contains_key("key-n"));
+                assert_eq!(*o.get("key-n").unwrap(), Value::Number(101));
+
+                assert!(o.contains_key("key-o"));
+                assert_eq!(*o.get("key-o").unwrap(), Value::Object(HashMap::new()));
+
+                assert!(o.contains_key("key-l"));
+                assert_eq!(*o.get("key-l").unwrap(), Value::Array(Vec::new()));
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn valid_2() {
+        let contents = fs::read_to_string("tests/step4/valid2.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let value = parser.parse();
+
+        match value {
+            Value::Object(o) => {
+                assert!(o.contains_key("key"));
+                assert_eq!(*o.get("key").unwrap(), Value::String(String::from("value")));
+
+                assert!(o.contains_key("key-n"));
+                assert_eq!(*o.get("key-n").unwrap(), Value::Number(101));
+
+                assert!(o.contains_key("key-o"));
+                let inner_o = o.get("key-o").unwrap();
+                match inner_o {
+                    Value::Object(inner_o) => {
+                        assert!(inner_o.contains_key("inner key"));
+                        assert_eq!(
+                            *inner_o.get("inner key").unwrap(),
+                            Value::String(String::from("inner value"))
+                        );
+                    }
+                    _ => panic!(),
+                }
+
+                assert!(o.contains_key("key-l"));
+                let l_values = o.get("key-l").unwrap();
+
+                match l_values {
+                    Value::Array(values) => {
+                        assert_eq!(values[0], Value::String(String::from("list value")))
+                    }
+                    _ => panic!(),
+                }
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn invalid() {
+        let contents = fs::read_to_string("tests/step4/invalid.json").expect("Unable to read file");
+        let mut lexer = Lexer::new(contents);
+        lexer.scan_tokens();
+        assert!(lexer.has_error);
     }
 }
