@@ -193,7 +193,10 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Expression {
-        self.primary()
+        if self.matches(Box::new([TokenType::LeftCurlyBracket])) {
+            return self.object();
+        }
+        return self.primary();
     }
 
     fn primary(&mut self) -> Expression {
@@ -205,9 +208,6 @@ impl<'a> Parser<'a> {
         }
         if self.matches(Box::new([TokenType::Number, TokenType::String])) {
             return Expression::Literal(self.previous().literal.clone());
-        }
-        if self.matches(Box::new([TokenType::LeftCurlyBracket])) {
-            return self.object();
         }
         return Expression::Literal(Value::Null);
     }
@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
                 }
             };
             self.advance();
-            let expr = self.primary();
+            let expr = self.expression();
             let value = match expr {
                 Expression::Literal(value) => value,
             };
@@ -233,7 +233,7 @@ impl<'a> Parser<'a> {
         if self.matches(Box::new([TokenType::RightCurlyBracket])) {
             return Expression::Literal(Value::Object(pairs.into_boxed_slice()));
         }
-        return Expression::Literal(Value::Object(Box::new([])));
+        return Expression::Literal(Value::Null);
     }
 
     fn matches(&mut self, token_types: Box<[TokenType]>) -> bool {
