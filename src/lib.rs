@@ -168,14 +168,8 @@ pub enum Value {
     Object(Box<[(String, Value)]>),
 }
 
-#[derive(Debug)]
-pub enum Expression {
-    Literal(Value),
-}
-
-// expression -> pair | literal
-// pair -> string ":" literal
-// literal -> string | number | "null" | "true" | "false" | object
+// pair -> string ":" value
+// value -> string | number | "null" | "true" | "false" | object | array
 // object -> "{" (pair ",")* "}"
 // array -> "[" (literal ",")* "]"
 pub struct Parser<'a> {
@@ -188,35 +182,38 @@ impl<'a> Parser<'a> {
         Parser { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Expression {
+    pub fn parse(&mut self) -> Value {
         self.expression()
     }
 
-    fn expression(&mut self) -> Expression {
+    fn expression(&mut self) -> Value {
         if self.matches(Box::new([TokenType::LeftCurlyBracket])) {
             return self.object();
         }
-        return self.primary();
+        return self.value();
     }
 
-    fn primary(&mut self) -> Expression {
+    fn value(&mut self) -> Value {
         if self.matches(Box::new([TokenType::False])) {
-            return Expression::Literal(Value::Bool(false));
+            return Value::Bool(false);
         }
         if self.matches(Box::new([TokenType::True])) {
-            return Expression::Literal(Value::Bool(true));
+            return Value::Bool(true);
         }
         if self.matches(Box::new([TokenType::Number, TokenType::String])) {
-            return Expression::Literal(self.previous().literal.clone());
+            return self.previous().literal.clone();
         }
         if self.matches(Box::new([TokenType::Null])) {
-            return Expression::Literal(Value::Null);
+            return Value::Null;
+        }
+        if self.matches(Box::new([TokenType::LeftSquareBracket])) {
+            return self.array();
         }
         report("Unrecognized value");
-        return Expression::Literal(Value::Null);
+        return Value::Null;
     }
 
-    fn object(&mut self) -> Expression {
+    fn object(&mut self) -> Value {
         let mut pairs = Vec::new();
         while self.matches(Box::new([TokenType::String, TokenType::Colon])) {
             let key = self.previous().literal.clone();
@@ -228,10 +225,7 @@ impl<'a> Parser<'a> {
                 }
             };
             self.advance();
-            let expr = self.expression();
-            let value = match expr {
-                Expression::Literal(value) => value,
-            };
+            let value = self.expression();
             pairs.push((key_string, value));
             if self.check(&TokenType::Comma) {
                 self.advance();
@@ -239,7 +233,7 @@ impl<'a> Parser<'a> {
         }
         if self.previous().token_type != TokenType::Comma {
             if self.matches(Box::new([TokenType::RightCurlyBracket])) {
-                return Expression::Literal(Value::Object(pairs.into_boxed_slice()));
+                return Value::Object(pairs.into_boxed_slice());
             } else {
                 report("Unclosed curly brackets.");
             }
@@ -247,7 +241,11 @@ impl<'a> Parser<'a> {
             report("Unexpected comma.")
         }
 
-        return Expression::Literal(Value::Null);
+        return Value::Object(Box::new([]));
+    }
+
+    fn array(&mut self) -> Value {
+        return Value::Array(Vec::new());
     }
 
     fn matches(&mut self, token_types: Box<[TokenType]>) -> bool {
@@ -293,8 +291,8 @@ pub fn run_file(path: &str) {
     let mut lexer = Lexer::new(contents);
     let tokens = lexer.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse();
-    println!("{:?}", expression);
+    let value = parser.parse();
+    println!("{:?}", value);
 }
 
 pub fn run_prompt() {
