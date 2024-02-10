@@ -209,6 +209,10 @@ impl<'a> Parser<'a> {
         if self.matches(Box::new([TokenType::Number, TokenType::String])) {
             return Expression::Literal(self.previous().literal.clone());
         }
+        if self.matches(Box::new([TokenType::Null])) {
+            return Expression::Literal(Value::Null);
+        }
+        report("Unrecognized value");
         return Expression::Literal(Value::Null);
     }
 
@@ -229,10 +233,20 @@ impl<'a> Parser<'a> {
                 Expression::Literal(value) => value,
             };
             pairs.push((key_string, value));
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
         }
-        if self.matches(Box::new([TokenType::RightCurlyBracket])) {
-            return Expression::Literal(Value::Object(pairs.into_boxed_slice()));
+        if self.previous().token_type != TokenType::Comma {
+            if self.matches(Box::new([TokenType::RightCurlyBracket])) {
+                return Expression::Literal(Value::Object(pairs.into_boxed_slice()));
+            } else {
+                report("Unclosed curly brackets.");
+            }
+        } else {
+            report("Unexpected comma.")
         }
+
         return Expression::Literal(Value::Null);
     }
 
