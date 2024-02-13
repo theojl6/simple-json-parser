@@ -197,7 +197,7 @@ impl<'a> Parser<'a> {
         if self.matches(Box::new([TokenType::LeftCurlyBracket])) {
             return self.object();
         }
-        return self.value();
+        self.value()
     }
 
     fn value(&mut self) -> Value {
@@ -217,7 +217,7 @@ impl<'a> Parser<'a> {
             return self.array();
         }
         report("Unrecognized value", &mut self.has_error);
-        return Value::Null;
+        Value::Null
     }
 
     fn object(&mut self) -> Value {
@@ -241,15 +241,14 @@ impl<'a> Parser<'a> {
         if self.previous().token_type != TokenType::Comma {
             if self.matches(Box::new([TokenType::RightCurlyBracket])) {
                 return Value::Object(pairs);
-            } else {
-                report("Unclosed curly brackets.", &mut self.has_error);
             }
+            report("Unclosed curly brackets.", &mut self.has_error);
         } else {
             report("Unexpected comma.", &mut self.has_error)
         }
         println!("has_error: {}", self.has_error);
 
-        return Value::Object(HashMap::new());
+        Value::Object(HashMap::new())
     }
 
     fn array(&mut self) -> Value {
@@ -264,14 +263,13 @@ impl<'a> Parser<'a> {
         if self.previous().token_type != TokenType::Comma {
             if self.matches(Box::new([TokenType::RightSquareBracket])) {
                 return Value::Array(values);
-            } else {
-                report("Unclosed square brackets.", &mut self.has_error);
             }
+            report("Unclosed square brackets.", &mut self.has_error);
         } else {
             report("Unexpected comma.", &mut self.has_error)
         }
 
-        return Value::Array(Vec::new());
+        Value::Array(Vec::new())
     }
 
     fn matches(&mut self, token_types: Box<[TokenType]>) -> bool {
